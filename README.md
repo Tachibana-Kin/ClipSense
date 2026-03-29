@@ -1,4 +1,6 @@
-# 视频管理工具
+# ClipSense
+
+VidTagger – Automatic video content understanding and tagging using multimodal AI (vision, audio, and text).
 
 基于AI的视频分析与管理工具，支持视频内容识别、标签管理、缩略图生成等功能。
 
