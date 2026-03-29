@@ -64,6 +64,7 @@ class MainWindow(QMainWindow):
         
         self.db_manager = DBManager()
         self.analyzer = None
+        self.temp_videos = []  # 存储临时视频列表
         
         self.init_ui()
         self.load_videos()
@@ -170,13 +171,23 @@ class MainWindow(QMainWindow):
         right_layout.addWidget(self.progress_bar)
     
     def load_videos(self):
-        """加载视频列表"""
+        """加载视频列表（合并数据库视频和临时视频）"""
         self.video_list.clear()
+        
+        # 添加数据库中的视频
         videos = self.db_manager.get_all_videos()
         for video in videos:
             item = QListWidgetItem(video["name"])
             item.setData(Qt.UserRole, video)
             self.video_list.addItem(item)
+        
+        # 添加临时视频（未分析的）
+        for video_info in self.temp_videos:
+            # 检查是否已经在数据库中
+            if not any(v["path"] == video_info["path"] for v in videos):
+                item = QListWidgetItem(video_info["name"])
+                item.setData(Qt.UserRole, video_info)
+                self.video_list.addItem(item)
     
     def on_video_selected(self, item):
         """视频选择事件"""
@@ -262,9 +273,10 @@ class MainWindow(QMainWindow):
                 "tags": [],
                 "metadata": {}
             }
-            item = QListWidgetItem(video_name)
-            item.setData(Qt.UserRole, video_info)
-            self.video_list.addItem(item)
+            # 添加到临时视频列表
+            self.temp_videos.append(video_info)
+            # 刷新列表显示
+            self.load_videos()
             QMessageBox.information(self, "添加成功", f"视频 '{video_name}' 已添加到列表")
     
     def on_add_folder(self):
@@ -285,10 +297,7 @@ class MainWindow(QMainWindow):
                         video_files.append(os.path.join(root, file))
             
             if video_files:
-                # 清空当前列表
-                self.video_list.clear()
-                
-                # 添加视频文件到列表
+                # 添加视频文件到临时列表
                 for video_path in video_files:
                     video_name = os.path.basename(video_path)
                     # 创建临时视频信息
@@ -300,10 +309,12 @@ class MainWindow(QMainWindow):
                         "tags": [],
                         "metadata": {}
                     }
-                    item = QListWidgetItem(video_name)
-                    item.setData(Qt.UserRole, video_info)
-                    self.video_list.addItem(item)
+                    # 添加到临时视频列表（避免重复）
+                    if not any(v["path"] == video_path for v in self.temp_videos):
+                        self.temp_videos.append(video_info)
                 
+                # 刷新列表显示
+                self.load_videos()
                 QMessageBox.information(self, "导入成功", f"成功导入 {len(video_files)} 个视频文件")
             else:
                 QMessageBox.warning(self, "未找到视频", "所选文件夹中没有找到视频文件")
@@ -328,18 +339,22 @@ class MainWindow(QMainWindow):
         self.progress_bar.setValue(100)
         QMessageBox.information(self, "分析完成", "视频分析完成！")
         self.progress_bar.setVisible(False)
-        # 重新加载当前选中的视频信息
-        selected_items = self.video_list.selectedItems()
-        if selected_items:
-            video_name = selected_items[0].text()
-            # 重新加载视频列表
-            self.load_videos()
-            # 重新选择原来的视频
-            for i in range(self.video_list.count()):
-                item = self.video_list.item(i)
-                if item.text() == video_name:
-                    self.video_list.setCurrentItem(item)
-                    break
+        
+        # 从临时列表中移除已分析的视频
+        video_path = analysis_result.get("video_path")
+        self.temp_videos = [v for v in self.temp_videos if v["path"] != video_path]
+        
+        # 重新加载视频列表（现在包含已分析的视频）
+        self.load_videos()
+        
+        # 重新选择刚才分析的视频
+        for i in range(self.video_list.count()):
+            item = self.video_list.item(i)
+            video_info = item.data(Qt.UserRole)
+            if video_info.get("path") == video_path:
+                self.video_list.setCurrentItem(item)
+                self.on_video_selected(item)
+                break
     
     def on_analysis_error(self, error):
         """分析错误"""
@@ -454,6 +469,15 @@ class MainWindow(QMainWindow):
             video_info = selected_items[0].data(Qt.UserRole)
             video_id = video_info["id"]
             
+            # 如果是临时视频（未分析），直接从列表移除
+            if video_id is None:
+                video_path = video_info["path"]
+                self.temp_videos = [v for v in self.temp_videos if v["path"] != video_path]
+                self.load_videos()
+                self.clear_video_details()
+                QMessageBox.information(self, "删除成功", "视频已从列表中移除！")
+                return
+            
             reply = QMessageBox.question(
                 self, "确认删除",
                 f"确定要删除视频 '{video_info['name']}' 吗？",
@@ -489,6 +513,11 @@ class MainWindow(QMainWindow):
         if selected_items:
             video_info = selected_items[0].data(Qt.UserRole)
             video_id = video_info["id"]
+            
+            # 如果是临时视频，提示需要先分析
+            if video_id is None:
+                QMessageBox.warning(self, "警告", "请先分析视频后再保存标签！")
+                return
             
             # 获取当前标签
             current_tags = [self.tag_list.item(i).text() for i in range(self.tag_list.count())]

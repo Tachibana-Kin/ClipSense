@@ -111,17 +111,22 @@ class ThumbnailGenerator:
         
         return selected_frames
     
-    def generate_thumbnail(self, frame: np.ndarray, size: Tuple[int, int] = (320, 240)) -> np.ndarray:
+    def generate_thumbnail(self, frame: np.ndarray, size: Tuple[int, int] = None) -> np.ndarray:
         """生成缩略图
         
         Args:
             frame: 视频帧
-            size: 缩略图尺寸
+            size: 缩略图尺寸（默认None表示保持原始分辨率）
             
         Returns:
-            缩略图
+            缩略图（保持原始分辨率）
         """
-        return cv2.resize(frame, size)
+        if size is None:
+            # 保持原始分辨率
+            return frame
+        else:
+            # 如果指定了尺寸，则进行缩放
+            return cv2.resize(frame, size)
     
     def save_thumbnails(self, video_path: str, output_dir: str, num_thumbnails: int = 5, frames: List[str] = None) -> List[str]:
         """保存视频的缩略图
