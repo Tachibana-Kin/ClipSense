@@ -1,0 +1,11 @@
+opencv-python
+moviepy
+torch
+torchvision
+Pillow
+PyQt5
+numpy
+pandas
+easyocr
+openai-whisper
+git+https://github.com/openai/CLIP.git

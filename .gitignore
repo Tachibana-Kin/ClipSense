@@ -1,0 +1,78 @@
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Model weights and checkpoints
+*.pth
+*.pt
+*.ckpt
+*.h5
+*.pb
+*.onnx
+*.tflite
+weights/
+checkpoints/
+models/pretrained/
+
+# Python virtual environment
+venv/
+env/
+ENV/
+.venv/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+temp/
+tmp/
+*.tmp
+
+# Output directories
+thumbnails/
+output/
+logs/
+
+# Feedback data
+feedback.json
+
+# Video files (if stored in project)
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.flv
+*.wmv
+*.webm
+
+# PyInstaller build files
+dist/
+build/
+*.spec
+
+# Executable files
+*.exe
+*.exe*
+*.dll
+*.so
