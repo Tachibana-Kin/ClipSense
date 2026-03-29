@@ -30,7 +30,11 @@ class VideoAnalyzer:
         """
         self.video_path = video_path
         self.video_name = Path(video_path).name
-        self.temp_dir = tempfile.mkdtemp()
+        # 创建安全的临时目录
+        self.temp_dir = tempfile.mkdtemp(prefix='video_analyzer_')
+        # 设置适当的权限（仅当前用户可访问）
+        import os
+        os.chmod(self.temp_dir, 0o700)
         self.clip_model = CLIPModel()
         self.whisper_model = WhisperModel()
         self.ocr_model = OCRModel()
