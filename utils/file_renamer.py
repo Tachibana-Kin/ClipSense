@@ -26,6 +26,9 @@ class FileRenamer:
         Returns:
             清理后的文件名
         """
+        # 移除路径组件，防止路径遍历
+        filename = os.path.basename(filename)
+        
         # 移除无效字符
         invalid_chars = '\\/:*?"<>|'
         for char in invalid_chars:
