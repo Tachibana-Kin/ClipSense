@@ -34,7 +34,7 @@ class DatasetBuilder:
         for dir_path in [self.train_dir, self.val_dir, self.test_dir]:
             os.makedirs(dir_path, exist_ok=True)
     
-    def extract_frames_from_video(self, video_path: str, num_frames: int = 30) -> List[str]:
+    def extract_frames_from_video(self, video_path: str, num_frames: int = 30) -> List[Tuple[str, str]]:
         """从视频中提取帧
         
         Args:
@@ -42,7 +42,7 @@ class DatasetBuilder:
             num_frames: 提取的帧数量
             
         Returns:
-            提取的帧文件路径列表
+            提取的帧文件路径列表，每个元素是 (frame_path, video_hash) 元组
         """
         print(f"正在从视频中提取帧: {video_path}")
         
@@ -55,12 +55,13 @@ class DatasetBuilder:
         temp_dir = os.path.join(self.output_dir, "temp_frames", video_hash)
         os.makedirs(temp_dir, exist_ok=True)
         print(f"临时目录: {temp_dir}")
+        print(f"视频哈希: {video_hash}")
         
         frame_paths = []
         for i, (frame_idx, frame) in enumerate(frames):
             try:
-                # 使用简单的数字文件名，避免任何字符问题
-                safe_filename = f"frame_{i:06d}.jpg"
+                # 使用包含视频哈希的文件名，避免任何字符问题
+                safe_filename = f"frame_{video_hash}_{i:06d}.jpg"
                 frame_path = os.path.join(temp_dir, safe_filename)
                 print(f"保存帧到: {frame_path}")
                 
@@ -71,7 +72,8 @@ class DatasetBuilder:
                 success = cv2.imwrite(frame_path, frame)
                 if success:
                     print(f"成功保存帧: {frame_path}")
-                    frame_paths.append(frame_path)
+                    # 返回帧路径和视频哈希
+                    frame_paths.append((frame_path, video_hash))
                 else:
                     print(f"保存帧失败: {frame_path}")
                     # 尝试使用绝对路径
@@ -80,7 +82,7 @@ class DatasetBuilder:
                     success = cv2.imwrite(abs_frame_path, frame)
                     if success:
                         print(f"使用绝对路径成功保存帧: {abs_frame_path}")
-                        frame_paths.append(abs_frame_path)
+                        frame_paths.append((abs_frame_path, video_hash))
                     else:
                         print(f"使用绝对路径也保存失败")
             except Exception as e:
@@ -97,6 +99,9 @@ class DatasetBuilder:
         Args:
             video_dir: 视频目录路径
             num_frames_per_video: 每个视频提取的帧数量
+            
+        Returns:
+            提取的帧信息列表，每个元素是 (frame_path, video_hash) 元组
         """
         print(f"正在处理视频目录: {video_dir}")
         
@@ -124,11 +129,11 @@ class DatasetBuilder:
         print(f"总共提取 {len(all_frames)} 帧")
         return all_frames
     
-    def split_dataset(self, frames: List[str], train_ratio: float = 0.7, val_ratio: float = 0.15):
+    def split_dataset(self, frames: List[Tuple[str, str]], train_ratio: float = 0.7, val_ratio: float = 0.15):
         """按比例划分数据集
         
         Args:
-            frames: 帧文件路径列表
+            frames: 帧信息列表，每个元素是 (frame_path, video_hash) 元组
             train_ratio: 训练集比例
             val_ratio: 验证集比例
         """
@@ -157,25 +162,32 @@ class DatasetBuilder:
         
         print("数据集划分完成")
     
-    def _copy_frames(self, frames: List[str], target_dir: str):
+    def _copy_frames(self, frames: List[Tuple[str, str]], target_dir: str):
         """将帧复制到目标目录
         
         Args:
-            frames: 帧文件路径列表
+            frames: 帧信息列表，每个元素是 (frame_path, video_hash) 元组
             target_dir: 目标目录
         """
-        # 获取目标目录中已有的文件数量，确保新文件从正确的序号开始
-        existing_files = [f for f in os.listdir(target_dir) if f.startswith("frame_") and f.endswith(".jpg")]
-        start_idx = len(existing_files)
+        # 按视频哈希分组，为每个视频维护独立的序号
+        video_counters = {}
         
-        for i, frame_path in enumerate(frames):
+        for frame_path, video_hash in frames:
             try:
                 # 确保目标目录存在
                 os.makedirs(target_dir, exist_ok=True)
                 
-                # 按顺序重命名文件，确保帧是按顺序保存的
-                # 使用全局序号，避免覆盖已有文件
-                dest_filename = f"frame_{start_idx + i:06d}.jpg"
+                # 获取该视频的当前序号
+                if video_hash not in video_counters:
+                    # 检查目标目录中该视频已有的帧数量
+                    existing_files = [f for f in os.listdir(target_dir) 
+                                    if f.startswith(f"frame_{video_hash}_") and f.endswith(".jpg")]
+                    video_counters[video_hash] = len(existing_files)
+                
+                # 生成新的文件名：frame_{video_hash}_{序号}.jpg
+                dest_filename = f"frame_{video_hash}_{video_counters[video_hash]:06d}.jpg"
+                video_counters[video_hash] += 1
+                
                 dest_path = os.path.join(target_dir, dest_filename)
                 shutil.copy2(frame_path, dest_path)
                 print(f"复制帧: {frame_path} -> {dest_path}")
