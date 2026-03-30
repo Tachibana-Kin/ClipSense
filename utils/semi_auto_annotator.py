@@ -121,22 +121,44 @@ class SemiAutoAnnotator:
                 print(f"图像目录不存在: {image_dir}")
                 return
             
+            # 创建类别文件
+            classes_file = os.path.join(self.output_dir, "classes.txt")
+            
+            # 加载标注结果，提取所有标签
+            annotations = self.load_annotations()
+            all_labels = set()
+            
+            if "train" in annotations:
+                for label_list in annotations["train"].values():
+                    all_labels.update(label_list)
+            
+            # 保存类别文件
+            with open(classes_file, 'w', encoding='utf-8') as f:
+                for label in sorted(all_labels):
+                    f.write(label + '\n')
+            
+            print(f"创建类别文件: {classes_file}")
+            print(f"包含 {len(all_labels)} 个类别")
+            
             print(f"正在打开LabelImg标注工具")
             print(f"请在LabelImg中执行以下操作:")
             print(f"1. 点击 'File' -> 'Change default saved annotation folder'")
             print(f"2. 选择标注保存目录: {self.output_dir}")
             print(f"3. 点击 'File' -> 'Open Dir'")
             print(f"4. 选择图像目录: {image_dir}")
-            print(f"5. 开始标注")
+            print(f"5. 点击 'File' -> 'Change Class List'")
+            print(f"6. 选择类别文件: {classes_file}")
+            print(f"7. 开始标注")
             
             # 使用虚拟环境中的labelImg.exe可执行文件
             labelimg_exe = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "venv", "Scripts", "labelImg.exe")
             if os.path.exists(labelimg_exe):
-                subprocess.Popen([labelimg_exe])
+                # 传递图像目录和类别文件给LabelImg
+                subprocess.Popen([labelimg_exe, image_dir, classes_file])
                 print("LabelImg已打开，请按照上述步骤进行操作")
             else:
                 # 尝试使用labelImg命令
-                subprocess.Popen(["labelImg"])
+                subprocess.Popen(["labelImg", image_dir, classes_file])
                 print("LabelImg已打开，请按照上述步骤进行操作")
         except Exception as e:
             print(f"打开LabelImg失败: {e}")
@@ -144,7 +166,7 @@ class SemiAutoAnnotator:
             print(f"您可以手动编辑标注文件: {self.annotation_file}")
             print("\n手动启动LabelImg的方法:")
             print("1. 激活虚拟环境: venv\Scripts\activate")
-            print("2. 运行命令: labelImg")
+            print("2. 运行命令: labelImg <image_dir> <classes_file>")
             print("3. 按照上述步骤进行操作")
     
     def update_annotation(self, image_path: str, labels: List[str]):
