@@ -11,6 +11,7 @@ import json
 import os
 import torch
 import clip
+from utils.translator import Translator
 
 class CLIPModel:
     """CLIP模型包装器类"""
@@ -39,13 +40,31 @@ class CLIPModel:
         self.custom_model_path = custom_model_path
         self.label_map_path = label_map_path
         
+        # 初始化翻译工具
+        self.translator = Translator()
+        
         # 加载标签映射
         if use_custom_model and label_map_path and os.path.exists(label_map_path):
             with open(label_map_path, 'r', encoding='utf-8') as f:
                 label_map = json.load(f)
-                self.chinese_labels = label_map.get("labels", [])
+                self.english_labels = label_map.get("labels", [])
                 self.label_to_idx = label_map.get("label_to_idx", {})
-            print(f"加载自定义标签映射，共 {len(self.chinese_labels)} 个标签")
+            print(f"加载自定义标签映射，共 {len(self.english_labels)} 个标签")
+            
+            # 将英文标签翻译为中文
+            if self.translator.is_available():
+                self.chinese_labels = []
+                for en_label in self.english_labels:
+                    # 先将下划线替换为空格，再翻译
+                    en_label_clean = en_label.replace("_", " ")
+                    zh_label = self.translator.translate(en_label_clean, "zh")
+                    if zh_label:
+                        self.chinese_labels.append(zh_label)
+                    else:
+                        self.chinese_labels.append(en_label)
+                print("英文标签已翻译为中文")
+            else:
+                self.chinese_labels = self.english_labels
         else:
             # 默认标签（仅当未使用自定义模型时）
             self.chinese_labels = [
