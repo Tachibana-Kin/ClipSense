@@ -106,6 +106,44 @@ class SemiAutoAnnotator:
                 return json.load(f)
         return {}
     
+    def fix_classes_encoding(self, classes_file: str):
+        """修复classes.txt文件编码问题
+        
+        LabelImg在Windows上保存时会使用GB2312编码，
+        这个方法会检测编码并转换为UTF-8
+        
+        Args:
+            classes_file: classes.txt文件路径
+        """
+        if not os.path.exists(classes_file):
+            return
+        
+        try:
+            # 尝试读取文件内容，先尝试UTF-8
+            content = None
+            encodings = ['utf-8', 'gb2312', 'gbk', 'utf-16', 'latin-1']
+            
+            for encoding in encodings:
+                try:
+                    with open(classes_file, 'r', encoding=encoding) as f:
+                        content = f.read()
+                    print(f"成功使用 {encoding} 编码读取 classes.txt")
+                    break
+                except UnicodeDecodeError:
+                    continue
+            
+            if content is None:
+                print(f"警告: 无法读取 classes.txt，所有编码尝试失败")
+                return
+            
+            # 重新保存为UTF-8编码
+            with open(classes_file, 'w', encoding='utf-8') as f:
+                f.write(content)
+            print(f"已将 classes.txt 转换为 UTF-8 编码")
+            
+        except Exception as e:
+            print(f"修复 classes.txt 编码失败: {e}")
+    
     def open_labelimg(self, image_dir: str):
         """打开LabelImg标注工具
         
@@ -123,6 +161,11 @@ class SemiAutoAnnotator:
             
             # 创建类别文件
             classes_file = os.path.join(self.output_dir, "classes.txt")
+            image_dir_classes = os.path.join(image_dir, "classes.txt")
+            
+            # 修复已存在的classes.txt文件编码（LabelImg可能会将其保存为GB2312）
+            self.fix_classes_encoding(classes_file)
+            self.fix_classes_encoding(image_dir_classes)
             
             # 加载标注结果，提取所有标签
             annotations = self.load_annotations()
@@ -140,7 +183,6 @@ class SemiAutoAnnotator:
                         f.write(label + '\n')
             
             # 在图像目录中也创建一个classes.txt文件，因为YoloReader会在那里寻找
-            image_dir_classes = os.path.join(image_dir, "classes.txt")
             with open(image_dir_classes, 'w', encoding='utf-8') as f:
                 for label in sorted(all_labels):
                     # 确保标签是字符串类型
@@ -157,9 +199,11 @@ class SemiAutoAnnotator:
             print(f"2. 选择标注保存目录: {self.output_dir}")
             print(f"3. 点击 'File' -> 'Open Dir'")
             print(f"4. 选择图像目录: {image_dir}")
-            print(f"5. 点击 'File' -> 'Change Class List'")
+            print(f"5. 点击 'File' -> 'Change Class List")
             print(f"6. 选择类别文件: {classes_file}")
             print(f"7. 开始标注")
+            print(f"\n重要提示: 标注完成后，classes.txt 可能会被保存为 GB2312 编码")
+            print(f"如果需要重新打开LabelImg，程序会自动修复编码问题")
             
             # 使用虚拟环境中的labelImg.exe可执行文件
             labelimg_exe = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "venv", "Scripts", "labelImg.exe")
