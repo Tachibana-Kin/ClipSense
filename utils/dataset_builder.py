@@ -49,8 +49,11 @@ class DatasetBuilder:
         # 使用缩略图生成器提取代表帧
         frames = self.thumbnail_generator.select_representative_frames(video_path, num_frames)
         
-        # 保存提取的帧
-        temp_dir = os.path.join(self.output_dir, "temp_frames")
+        # 为每个视频创建唯一的临时子目录
+        video_name = os.path.splitext(os.path.basename(video_path))[0]
+        # 移除可能导致问题的字符
+        safe_video_name = "".join(c for c in video_name if c.isalnum() or c in ["_", "-"])
+        temp_dir = os.path.join(self.output_dir, "temp_frames", safe_video_name)
         os.makedirs(temp_dir, exist_ok=True)
         print(f"临时目录: {temp_dir}")
         
@@ -148,13 +151,14 @@ class DatasetBuilder:
             frames: 帧文件路径列表
             target_dir: 目标目录
         """
-        for frame_path in frames:
+        for i, frame_path in enumerate(frames):
             try:
                 # 确保目标目录存在
                 os.makedirs(target_dir, exist_ok=True)
                 
-                # 复制文件
-                dest_path = os.path.join(target_dir, os.path.basename(frame_path))
+                # 按顺序重命名文件，确保帧是按顺序保存的
+                dest_filename = f"frame_{i:06d}.jpg"
+                dest_path = os.path.join(target_dir, dest_filename)
                 shutil.copy2(frame_path, dest_path)
             except Exception as e:
                 print(f"复制帧 {frame_path} 失败: {e}")
