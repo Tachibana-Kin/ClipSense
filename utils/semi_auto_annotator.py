@@ -132,10 +132,17 @@ class SemiAutoAnnotator:
                 for label_list in annotations["train"].values():
                     all_labels.update(label_list)
             
-            # 保存类别文件
-            with open(classes_file, 'w', encoding='utf-8') as f:
+            # 保存类别文件（使用GBK编码，LabelImg默认使用GBK）
+            with open(classes_file, 'w', encoding='gbk', errors='ignore') as f:
                 for label in sorted(all_labels):
-                    f.write(label + '\n')
+                    # 确保标签是字符串类型
+                    if isinstance(label, str):
+                        # 尝试编码为GBK，忽略无法编码的字符
+                        try:
+                            f.write(label + '\n')
+                        except UnicodeEncodeError:
+                            # 如果编码失败，使用替代字符
+                            f.write(label.encode('gbk', errors='ignore').decode('gbk') + '\n')
             
             print(f"创建类别文件: {classes_file}")
             print(f"包含 {len(all_labels)} 个类别")
