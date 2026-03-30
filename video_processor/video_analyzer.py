@@ -213,8 +213,9 @@ class VideoAnalyzer:
         Returns:
             综合分析结果
         """
-        # 提取帧（减少帧数，提高效率）
-        frames = self.extract_frames(frame_interval=30)  # 每30帧提取一帧
+        # 提取帧（每2-3分钟提取一帧，假设30fps）
+        # 2分钟 = 30fps * 120秒 = 3600帧
+        frames = self.extract_frames(frame_interval=3600)  # 每2分钟提取一帧
         
         # 分析视觉内容
         clip_tags = self.analyze_frames_with_clip(frames)
@@ -292,7 +293,7 @@ class VideoAnalyzer:
         """
         return self.tag_manager.get_tags()
     
-    def generate_thumbnails(self, output_dir: str = None, num_thumbnails: int = 5, frames: List[str] = None) -> List[str]:
+    def generate_thumbnails(self, output_dir: str = None, num_thumbnails: int = 3, frames: List[str] = None) -> List[str]:
         """生成视频缩略图
         
         Args:

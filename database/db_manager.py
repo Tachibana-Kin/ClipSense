@@ -364,6 +364,24 @@ class DBManager:
             ''', (video[0],))
             video_info["tags"] = [row[0] for row in cursor.fetchall()]
             
+            # 获取元数据
+            cursor.execute(
+                "SELECT clip_tags, audio_transcription, audio_keywords, ocr_text, ocr_keywords, clothes_tags, thumbnail_paths FROM video_metadata WHERE video_id = ?",
+                (video[0],)
+            )
+            metadata = cursor.fetchone()
+            
+            if metadata:
+                video_info["metadata"] = {
+                    "clip_tags": json.loads(metadata[0]) if metadata[0] else [],
+                    "audio_transcription": metadata[1],
+                    "audio_keywords": json.loads(metadata[2]) if metadata[2] else [],
+                    "ocr_text": metadata[3],
+                    "ocr_keywords": json.loads(metadata[4]) if metadata[4] else [],
+                    "clothes_tags": json.loads(metadata[5]) if metadata[5] else [],
+                    "thumbnail_paths": json.loads(metadata[6]) if metadata[6] else []
+                }
+            
             result.append(video_info)
         
         conn.close()
@@ -435,3 +453,28 @@ class DBManager:
         
         conn.commit()
         conn.close()
+    
+    def get_all_thumbnail_paths(self) -> List[str]:
+        """获取所有已使用的缩略图路径
+        
+        Returns:
+            缩略图路径列表
+        """
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        # 获取所有视频的缩略图路径
+        cursor.execute("SELECT thumbnail_paths FROM video_metadata")
+        results = cursor.fetchall()
+        
+        thumbnail_paths = []
+        for result in results:
+            if result[0]:
+                try:
+                    paths = json.loads(result[0])
+                    thumbnail_paths.extend(paths)
+                except json.JSONDecodeError:
+                    pass
+        
+        conn.close()
+        return thumbnail_paths

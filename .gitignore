@@ -53,6 +53,8 @@ tmp/
 thumbnails/
 output/
 logs/
+custom_model/
+dataset/
 
 # Feedback data
 feedback.json
