@@ -164,15 +164,21 @@ class DatasetBuilder:
             frames: 帧文件路径列表
             target_dir: 目标目录
         """
+        # 获取目标目录中已有的文件数量，确保新文件从正确的序号开始
+        existing_files = [f for f in os.listdir(target_dir) if f.startswith("frame_") and f.endswith(".jpg")]
+        start_idx = len(existing_files)
+        
         for i, frame_path in enumerate(frames):
             try:
                 # 确保目标目录存在
                 os.makedirs(target_dir, exist_ok=True)
                 
                 # 按顺序重命名文件，确保帧是按顺序保存的
-                dest_filename = f"frame_{i:06d}.jpg"
+                # 使用全局序号，避免覆盖已有文件
+                dest_filename = f"frame_{start_idx + i:06d}.jpg"
                 dest_path = os.path.join(target_dir, dest_filename)
                 shutil.copy2(frame_path, dest_path)
+                print(f"复制帧: {frame_path} -> {dest_path}")
             except Exception as e:
                 print(f"复制帧 {frame_path} 失败: {e}")
     
