@@ -18,6 +18,21 @@ from models.clip_model import CLIPModel
 import clip
 from typing import List, Dict
 
+def collate_fn(batch):
+    """自定义collate函数，处理变长标签列表
+    
+    Args:
+        batch: 批次数据列表，每个元素是 (image, labels) 元组
+        
+    Returns:
+        images: 图像张量
+        labels: 标签列表的列表
+    """
+    images = torch.stack([item[0] for item in batch])
+    labels = [item[1] for item in batch]
+    return images, labels
+
+
 class CustomDataset(Dataset):
     """自定义数据集类"""
     
@@ -139,10 +154,10 @@ class CustomTrainer:
             transform=transform
         )
         
-        # 创建数据加载器
-        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-        val_loader = DataLoader(val_dataset, batch_size=batch_size)
-        test_loader = DataLoader(test_dataset, batch_size=batch_size)
+        # 创建数据加载器，使用自定义collate函数处理变长标签列表
+        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, collate_fn=collate_fn)
+        val_loader = DataLoader(val_dataset, batch_size=batch_size, collate_fn=collate_fn)
+        test_loader = DataLoader(test_dataset, batch_size=batch_size, collate_fn=collate_fn)
         
         print(f"训练集: {len(train_dataset)} 样本")
         print(f"验证集: {len(val_dataset)} 样本")
