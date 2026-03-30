@@ -49,21 +49,23 @@ class DatasetBuilder:
         # 使用缩略图生成器提取代表帧
         frames = self.thumbnail_generator.select_representative_frames(video_path, num_frames)
         
-        # 为每个视频创建唯一的临时子目录
-        video_name = os.path.splitext(os.path.basename(video_path))[0]
-        # 移除可能导致问题的字符
-        safe_video_name = "".join(c for c in video_name if c.isalnum() or c in ["_", "-"])
-        temp_dir = os.path.join(self.output_dir, "temp_frames", safe_video_name)
+        # 为每个视频创建唯一的临时子目录（使用数字ID避免中文路径问题）
+        import hashlib
+        video_hash = hashlib.md5(video_path.encode()).hexdigest()[:8]
+        temp_dir = os.path.join(self.output_dir, "temp_frames", video_hash)
         os.makedirs(temp_dir, exist_ok=True)
         print(f"临时目录: {temp_dir}")
         
         frame_paths = []
         for i, (frame_idx, frame) in enumerate(frames):
             try:
-                # 使用更安全的文件名，避免中文字符问题
-                safe_filename = f"frame_{i}.jpg"
+                # 使用简单的数字文件名，避免任何字符问题
+                safe_filename = f"frame_{i:06d}.jpg"
                 frame_path = os.path.join(temp_dir, safe_filename)
                 print(f"保存帧到: {frame_path}")
+                
+                # 确保目录存在
+                os.makedirs(os.path.dirname(frame_path), exist_ok=True)
                 
                 # 保存帧
                 success = cv2.imwrite(frame_path, frame)
@@ -72,8 +74,19 @@ class DatasetBuilder:
                     frame_paths.append(frame_path)
                 else:
                     print(f"保存帧失败: {frame_path}")
+                    # 尝试使用绝对路径
+                    abs_frame_path = os.path.abspath(frame_path)
+                    print(f"尝试使用绝对路径: {abs_frame_path}")
+                    success = cv2.imwrite(abs_frame_path, frame)
+                    if success:
+                        print(f"使用绝对路径成功保存帧: {abs_frame_path}")
+                        frame_paths.append(abs_frame_path)
+                    else:
+                        print(f"使用绝对路径也保存失败")
             except Exception as e:
                 print(f"处理帧 {i} 失败: {e}")
+                import traceback
+                traceback.print_exc()
         
         print(f"成功提取 {len(frame_paths)} 帧")
         return frame_paths
