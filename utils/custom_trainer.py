@@ -173,8 +173,9 @@ class CustomTrainer:
         """
         device = "cuda" if torch.cuda.is_available() else "cpu"
         
-        # 加载预训练的CLIP模型
-        model, preprocess = clip.load("ViT-B/32", device=device)
+        # 加载预训练的CLIP模型，使用float32精度
+        model, preprocess = clip.load("ViT-B/32", device=device, jit=False)
+        model = model.float()  # 转换为float32
         
         # 冻结模型参数
         for param in model.parameters():
