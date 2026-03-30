@@ -105,16 +105,39 @@ class SemiAutoAnnotator:
             image_dir: 图像目录路径
         """
         try:
-            # 检查LabelImg是否安装
-            subprocess.run(["labelImg", "--version"], capture_output=True, check=True)
+            import subprocess
+            import os
             
-            # 打开LabelImg
-            print(f"正在打开LabelImg标注工具，图像目录: {image_dir}")
-            subprocess.Popen(["labelImg", image_dir, self.output_dir])
-            print("LabelImg已打开，请手动修正标注")
+            # 确保图像目录存在
+            if not os.path.exists(image_dir):
+                print(f"图像目录不存在: {image_dir}")
+                return
+            
+            print(f"正在打开LabelImg标注工具")
+            print(f"请在LabelImg中执行以下操作:")
+            print(f"1. 点击 'File' -> 'Change default saved annotation folder'")
+            print(f"2. 选择标注保存目录: {self.output_dir}")
+            print(f"3. 点击 'File' -> 'Open Dir'")
+            print(f"4. 选择图像目录: {image_dir}")
+            print(f"5. 开始标注")
+            
+            # 使用虚拟环境中的labelImg.exe可执行文件
+            labelimg_exe = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "venv", "Scripts", "labelImg.exe")
+            if os.path.exists(labelimg_exe):
+                subprocess.Popen([labelimg_exe])
+                print("LabelImg已打开，请按照上述步骤进行操作")
+            else:
+                # 尝试使用labelImg命令
+                subprocess.Popen(["labelImg"])
+                print("LabelImg已打开，请按照上述步骤进行操作")
         except Exception as e:
             print(f"打开LabelImg失败: {e}")
             print("请确保LabelImg已安装，或使用其他标注工具")
+            print(f"您可以手动编辑标注文件: {self.annotation_file}")
+            print("\n手动启动LabelImg的方法:")
+            print("1. 激活虚拟环境: venv\Scripts\activate")
+            print("2. 运行命令: labelImg")
+            print("3. 按照上述步骤进行操作")
     
     def update_annotation(self, image_path: str, labels: List[str]):
         """更新标注
@@ -165,7 +188,7 @@ class SemiAutoAnnotator:
         Args:
             confidence_threshold: 置信度阈值
         """
-        # 处理训练集
+        # 只处理训练集，验证集和测试集不需要标注
         train_dir = os.path.join(self.dataset_dir, "train")
         if os.path.exists(train_dir):
             print("处理训练集...")
@@ -173,27 +196,9 @@ class SemiAutoAnnotator:
         else:
             train_annotations = {}
         
-        # 处理验证集
-        val_dir = os.path.join(self.dataset_dir, "val")
-        if os.path.exists(val_dir):
-            print("处理验证集...")
-            val_annotations = self.auto_annotate(val_dir, confidence_threshold)
-        else:
-            val_annotations = {}
-        
-        # 处理测试集
-        test_dir = os.path.join(self.dataset_dir, "test")
-        if os.path.exists(test_dir):
-            print("处理测试集...")
-            test_annotations = self.auto_annotate(test_dir, confidence_threshold)
-        else:
-            test_annotations = {}
-        
-        # 合并标注结果
+        # 保存标注结果（只包含训练集）
         all_annotations = {
-            "train": train_annotations,
-            "val": val_annotations,
-            "test": test_annotations
+            "train": train_annotations
         }
         
         # 保存标注结果
