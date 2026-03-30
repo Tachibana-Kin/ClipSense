@@ -12,6 +12,7 @@ import subprocess
 from pathlib import Path
 from typing import List, Dict, Tuple
 from models.clip_model import CLIPModel
+from utils.translator import Translator
 
 class SemiAutoAnnotator:
     """半自动标注器类"""
@@ -26,6 +27,7 @@ class SemiAutoAnnotator:
         self.dataset_dir = dataset_dir
         self.output_dir = output_dir
         self.clip_model = CLIPModel()
+        self.translator = Translator()
         
         # 创建输出目录
         os.makedirs(output_dir, exist_ok=True)
@@ -65,6 +67,12 @@ class SemiAutoAnnotator:
                 
                 # 过滤置信度高于阈值的标签
                 labels = [pred["label"] for pred in predictions if pred["confidence"] >= confidence_threshold]
+                
+                # 将中文标签翻译为英文
+                if self.translator.is_available():
+                    translated_labels = self.translator.translate_tags(labels)
+                    print(f"标签翻译: {labels} -> {translated_labels}")
+                    labels = translated_labels
                 
                 # 保存标注结果
                 relative_path = os.path.relpath(image_path, self.dataset_dir)
@@ -146,6 +154,12 @@ class SemiAutoAnnotator:
             image_path: 图像路径
             labels: 标签列表
         """
+        # 将中文标签翻译为英文
+        if self.translator.is_available():
+            translated_labels = self.translator.translate_tags(labels)
+            print(f"标签翻译: {labels} -> {translated_labels}")
+            labels = translated_labels
+        
         annotations = self.load_annotations()
         
         # 确定图像属于哪个分割（train/val/test）
