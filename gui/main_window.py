@@ -13,7 +13,7 @@ from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
     QPushButton, QFileDialog, QListWidget, QListWidgetItem, 
     QLabel, QLineEdit, QTextEdit, QGridLayout, QScrollArea,
-    QMessageBox, QProgressBar, QMenu, QSizePolicy
+    QMessageBox, QProgressBar, QMenu, QSizePolicy, QTabWidget
 )
 from PyQt5.QtGui import QPixmap, QImage
 from PyQt5.QtCore import Qt, QThread, pyqtSignal
@@ -23,6 +23,7 @@ from database.db_manager import DBManager
 from utils.dataset_builder import DatasetBuilder
 from utils.semi_auto_annotator import SemiAutoAnnotator
 from utils.custom_trainer import CustomTrainer
+from train_custom_model import TrainCustomModel
 
 class AnalysisThread(QThread):
     """分析线程"""
@@ -79,12 +80,31 @@ class MainWindow(QMainWindow):
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         
-        main_layout = QHBoxLayout()
+        main_layout = QVBoxLayout()
         central_widget.setLayout(main_layout)
+        
+        # 创建选项卡
+        self.tab_widget = QTabWidget()
+        main_layout.addWidget(self.tab_widget)
+        
+        # 创建视频管理选项卡
+        self.video_tab = QWidget()
+        self.tab_widget.addTab(self.video_tab, "视频管理")
+        self.init_video_tab()
+        
+        # 创建模型训练选项卡
+        self.model_tab = QWidget()
+        self.tab_widget.addTab(self.model_tab, "模型训练")
+        self.init_model_tab()
+    
+    def init_video_tab(self):
+        """初始化视频管理选项卡"""
+        video_layout = QHBoxLayout()
+        self.video_tab.setLayout(video_layout)
         
         # 左侧布局
         left_layout = QVBoxLayout()
-        main_layout.addLayout(left_layout, 1)
+        video_layout.addLayout(left_layout, 1)
         
         # 视频列表
         self.video_list = QListWidget()
@@ -109,7 +129,7 @@ class MainWindow(QMainWindow):
         
         # 右侧布局
         right_layout = QVBoxLayout()
-        main_layout.addLayout(right_layout, 3)
+        video_layout.addLayout(right_layout, 3)
         
         # 顶部按钮
         top_buttons = QHBoxLayout()
@@ -135,14 +155,9 @@ class MainWindow(QMainWindow):
         clean_all_action.triggered.connect(self.on_clean_all_thumbnails)
         clean_button.setMenu(clean_menu)
         
-        # 添加模型训练按钮
-        model_train_button = QPushButton("模型训练")
-        model_train_button.clicked.connect(self.show_model_train_page)
-        
         top_buttons.addWidget(add_button)
         top_buttons.addWidget(analyze_button)
         top_buttons.addWidget(clean_button)
-        top_buttons.addWidget(model_train_button)
         right_layout.addLayout(top_buttons)
         
         # 为视频列表添加右键菜单
@@ -197,10 +212,230 @@ class MainWindow(QMainWindow):
         self.progress_bar.setVisible(False)
         self.progress_bar.setTextVisible(False)  # 不显示百分比文本
         right_layout.addWidget(self.progress_bar)
+    
+    def init_model_tab(self):
+        """初始化模型训练选项卡"""
+        model_layout = QVBoxLayout()
+        self.model_tab.setLayout(model_layout)
         
-        # 模型训练页面
-        self.model_train_page = None
+        # 视频文件选择
+        video_select_layout = QHBoxLayout()
+        video_select_layout.addWidget(QLabel("视频文件:"))
+        self.video_file_input = QLineEdit()
+        self.video_file_input.setPlaceholderText("选择视频文件")
+        video_select_layout.addWidget(self.video_file_input)
+        video_select_button = QPushButton("浏览")
+        video_select_button.clicked.connect(self.on_select_video_file)
+        video_select_layout.addWidget(video_select_button)
+        model_layout.addLayout(video_select_layout)
         
+        # 输出目录选择
+        output_dir_layout = QHBoxLayout()
+        output_dir_layout.addWidget(QLabel("输出目录:"))
+        self.output_dir_input = QLineEdit()
+        self.output_dir_input.setText("custom_model")
+        output_dir_layout.addWidget(self.output_dir_input)
+        output_dir_button = QPushButton("浏览")
+        output_dir_button.clicked.connect(self.on_select_output_dir)
+        output_dir_layout.addWidget(output_dir_button)
+        model_layout.addLayout(output_dir_layout)
+        
+        # 运行步骤按钮
+        step_buttons_layout = QHBoxLayout()
+        step_buttons_layout.addWidget(QLabel("运行步骤:"))
+        
+        self.build_dataset_button = QPushButton("构建数据集")
+        self.build_dataset_button.clicked.connect(lambda: self.on_run_step("构建数据集"))
+        step_buttons_layout.addWidget(self.build_dataset_button)
+        
+        self.manual_annotate_button = QPushButton("手动标注")
+        self.manual_annotate_button.clicked.connect(self.on_manual_annotate)
+        step_buttons_layout.addWidget(self.manual_annotate_button)
+        
+        self.train_button = QPushButton("训练模型")
+        self.train_button.clicked.connect(lambda: self.on_run_step("训练模型"))
+        step_buttons_layout.addWidget(self.train_button)
+        
+        self.label_button = QPushButton("模型标记")
+        self.label_button.clicked.connect(lambda: self.on_run_step("模型标记"))
+        step_buttons_layout.addWidget(self.label_button)
+        
+        model_layout.addLayout(step_buttons_layout)
+        
+        # 参数设置
+        params_layout = QGridLayout()
+        
+        # 提取帧数量
+        params_layout.addWidget(QLabel("每个视频提取帧数量:"), 0, 0)
+        self.num_frames_input = QLineEdit()
+        self.num_frames_input.setText("30")
+        params_layout.addWidget(self.num_frames_input, 0, 1)
+        
+        # 训练集比例
+        params_layout.addWidget(QLabel("训练集比例:"), 1, 0)
+        self.train_ratio_input = QLineEdit()
+        self.train_ratio_input.setText("0.7")
+        params_layout.addWidget(self.train_ratio_input, 1, 1)
+        
+        # 验证集比例
+        params_layout.addWidget(QLabel("验证集比例:"), 2, 0)
+        self.val_ratio_input = QLineEdit()
+        self.val_ratio_input.setText("0.15")
+        params_layout.addWidget(self.val_ratio_input, 2, 1)
+        
+        # 置信度阈值
+        params_layout.addWidget(QLabel("置信度阈值:"), 3, 0)
+        self.confidence_threshold_input = QLineEdit()
+        self.confidence_threshold_input.setText("0.5")
+        params_layout.addWidget(self.confidence_threshold_input, 3, 1)
+        
+        # 训练轮数
+        params_layout.addWidget(QLabel("训练轮数:"), 4, 0)
+        self.epochs_input = QLineEdit()
+        self.epochs_input.setText("50")
+        params_layout.addWidget(self.epochs_input, 4, 1)
+        
+        # 批处理大小
+        params_layout.addWidget(QLabel("批处理大小:"), 5, 0)
+        self.batch_size_input = QLineEdit()
+        self.batch_size_input.setText("32")
+        params_layout.addWidget(self.batch_size_input, 5, 1)
+        
+        # 学习率
+        params_layout.addWidget(QLabel("学习率:"), 6, 0)
+        self.lr_input = QLineEdit()
+        self.lr_input.setText("0.0001")
+        params_layout.addWidget(self.lr_input, 6, 1)
+        
+        model_layout.addLayout(params_layout)
+        
+        # 日志输出
+        log_layout = QVBoxLayout()
+        log_layout.addWidget(QLabel("运行日志:"))
+        self.log_text = QTextEdit()
+        self.log_text.setReadOnly(True)
+        log_layout.addWidget(self.log_text)
+        model_layout.addLayout(log_layout)
+    
+    def on_select_video_file(self):
+        """选择视频文件"""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "选择视频文件", "", "视频文件 (*.mp4 *.avi *.mov *.mkv *.webm)"
+        )
+        if file_path:
+            self.video_file_input.setText(file_path)
+    
+    def on_select_output_dir(self):
+        """选择输出目录"""
+        dir_path = QFileDialog.getExistingDirectory(self, "选择输出目录")
+        if dir_path:
+            self.output_dir_input.setText(dir_path)
+    
+    def on_manual_annotate(self):
+        """打开LabelImg进行手动标注"""
+        output_dir = self.output_dir_input.text()
+        
+        if not output_dir:
+            QMessageBox.warning(self, "警告", "请设置输出目录")
+            return
+        
+        # 构建数据集目录路径
+        dataset_dir = os.path.join(output_dir, "dataset")
+        train_dir = os.path.join(dataset_dir, "train")
+        annotations_dir = os.path.join(output_dir, "annotations")
+        
+        if not os.path.exists(train_dir):
+            QMessageBox.warning(self, "警告", "训练集目录不存在，请先构建数据集")
+            return
+        
+        # 创建类别文件
+        classes_file = os.path.join(annotations_dir, "classes.txt")
+        os.makedirs(annotations_dir, exist_ok=True)
+        
+        # 如果类别文件不存在，创建一个空的
+        if not os.path.exists(classes_file):
+            with open(classes_file, 'w', encoding='utf-8') as f:
+                pass  # 创建空文件，用户可以在LabelImg中添加类别
+        
+        # 在训练集目录中也创建类别文件
+        train_classes_file = os.path.join(train_dir, "classes.txt")
+        if not os.path.exists(train_classes_file):
+            with open(train_classes_file, 'w', encoding='utf-8') as f:
+                pass
+        
+        try:
+            import subprocess
+            
+            # 使用虚拟环境中的labelImg.exe可执行文件
+            labelimg_exe = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "venv", "Scripts", "labelImg.exe")
+            
+            print(f"正在打开LabelImg标注工具")
+            print(f"图像目录: {train_dir}")
+            print(f"类别文件: {classes_file}")
+            print(f"标注保存目录: {annotations_dir}")
+            
+            if os.path.exists(labelimg_exe):
+                # 传递图像目录和类别文件给LabelImg
+                subprocess.Popen([labelimg_exe, train_dir, classes_file])
+                QMessageBox.information(self, "提示", "LabelImg已打开，请进行手动标注\n标注文件将保存在: " + annotations_dir)
+            else:
+                # 尝试使用labelImg命令
+                subprocess.Popen(["labelImg", train_dir, classes_file])
+                QMessageBox.information(self, "提示", "LabelImg已打开，请进行手动标注\n标注文件将保存在: " + annotations_dir)
+        except Exception as e:
+            QMessageBox.warning(self, "错误", f"打开LabelImg失败: {str(e)}")
+    
+    def on_run_step(self, step):
+        """运行指定步骤"""
+        # 获取参数
+        video_file = self.video_file_input.text()
+        output_dir = self.output_dir_input.text()
+        
+        # 检查输入
+        if step == "构建数据集":
+            if not video_file:
+                QMessageBox.warning(self, "警告", "请选择视频文件")
+                return
+        else:
+            if not output_dir:
+                QMessageBox.warning(self, "警告", "请设置输出目录")
+                return
+        
+        try:
+            num_frames = int(self.num_frames_input.text())
+            train_ratio = float(self.train_ratio_input.text())
+            val_ratio = float(self.val_ratio_input.text())
+            confidence_threshold = float(self.confidence_threshold_input.text())
+            epochs = int(self.epochs_input.text())
+            batch_size = int(self.batch_size_input.text())
+            lr = float(self.lr_input.text())
+        except ValueError:
+            QMessageBox.warning(self, "警告", "请输入有效的参数")
+            return
+        
+        # 运行训练
+        self.log_text.clear()
+        self.log_text.append(f"开始运行: {step}")
+        
+        try:
+            # 使用视频文件
+            trainer = TrainCustomModel(video_file, output_dir)
+            
+            if step == "构建数据集":
+                self.log_text.append("=== 构建数据集 ===")
+                trainer.build_dataset(num_frames, train_ratio, val_ratio)
+            elif step == "训练模型":
+                self.log_text.append("=== 模型训练 ===")
+                trainer.train_model(epochs, batch_size, lr)
+            elif step == "模型标记":
+                self.log_text.append("=== 模型标记 ===")
+                trainer.label_with_trained_model()
+            
+            self.log_text.append("运行完成！")
+            QMessageBox.information(self, "提示", "运行完成！")
+        except Exception as e:
+            self.log_text.append(f"运行失败: {str(e)}")
+            QMessageBox.warning(self, "错误", f"运行失败: {str(e)}")
 
     
     def load_videos(self):
@@ -970,13 +1205,17 @@ class ModelTrainPage(QMainWindow):
         self.build_dataset_button.clicked.connect(lambda: self.on_run_step("构建数据集"))
         step_buttons_layout.addWidget(self.build_dataset_button)
         
-        self.annotate_button = QPushButton("半自动标注")
-        self.annotate_button.clicked.connect(lambda: self.on_run_step("半自动标注"))
-        step_buttons_layout.addWidget(self.annotate_button)
+        self.manual_annotate_button = QPushButton("手动标注")
+        self.manual_annotate_button.clicked.connect(self.on_manual_annotate)
+        step_buttons_layout.addWidget(self.manual_annotate_button)
         
         self.train_button = QPushButton("训练模型")
         self.train_button.clicked.connect(lambda: self.on_run_step("训练模型"))
         step_buttons_layout.addWidget(self.train_button)
+        
+        self.label_button = QPushButton("模型标记")
+        self.label_button.clicked.connect(lambda: self.on_run_step("模型标记"))
+        step_buttons_layout.addWidget(self.label_button)
         
         main_layout.addLayout(step_buttons_layout)
         
@@ -1034,77 +1273,3 @@ class ModelTrainPage(QMainWindow):
         self.log_text.setReadOnly(True)
         log_layout.addWidget(self.log_text)
         main_layout.addLayout(log_layout)
-    
-    def on_select_video_dir(self):
-        """选择视频目录"""
-        dir_path = QFileDialog.getExistingDirectory(self, "选择视频目录")
-        if dir_path:
-            self.video_dir_input.setText(dir_path)
-    
-    def on_select_output_dir(self):
-        """选择输出目录"""
-        dir_path = QFileDialog.getExistingDirectory(self, "选择输出目录")
-        if dir_path:
-            self.output_dir_input.setText(dir_path)
-    
-    def on_select_video_file(self):
-        """选择视频文件"""
-        file_path, _ = QFileDialog.getOpenFileName(
-            self, "选择视频文件", "", "视频文件 (*.mp4 *.avi *.mov *.mkv *.webm)"
-        )
-        if file_path:
-            self.video_file_input.setText(file_path)
-    
-    def on_run_step(self, step):
-        """运行指定步骤"""
-        # 获取参数
-        video_file = self.video_file_input.text()
-        output_dir = self.output_dir_input.text()
-        
-        # 检查输入
-        if step == "构建数据集":
-            if not video_file:
-                QMessageBox.warning(self, "警告", "请选择视频文件")
-                return
-        else:
-            if not output_dir:
-                QMessageBox.warning(self, "警告", "请设置输出目录")
-                return
-        
-        try:
-            num_frames = int(self.num_frames_input.text())
-            train_ratio = float(self.train_ratio_input.text())
-            val_ratio = float(self.val_ratio_input.text())
-            confidence_threshold = float(self.confidence_threshold_input.text())
-            epochs = int(self.epochs_input.text())
-            batch_size = int(self.batch_size_input.text())
-            lr = float(self.lr_input.text())
-        except ValueError:
-            QMessageBox.warning(self, "警告", "请输入有效的参数")
-            return
-        
-        # 运行训练
-        self.log_text.clear()
-        self.log_text.append(f"开始运行: {step}")
-        
-        try:
-            from train_custom_model import TrainCustomModel
-            
-            # 使用视频文件
-            trainer = TrainCustomModel(video_file, output_dir)
-            
-            if step == "构建数据集":
-                self.log_text.append("=== 构建数据集 ===")
-                trainer.build_dataset(num_frames, train_ratio, val_ratio)
-            elif step == "半自动标注":
-                self.log_text.append("=== 半自动标注 ===")
-                trainer.annotate_dataset(confidence_threshold)
-            elif step == "训练模型":
-                self.log_text.append("=== 模型训练 ===")
-                trainer.train_model(epochs, batch_size, lr)
-            
-            self.log_text.append("运行完成！")
-            QMessageBox.information(self, "提示", "运行完成！")
-        except Exception as e:
-            self.log_text.append(f"运行失败: {str(e)}")
-            QMessageBox.warning(self, "错误", f"运行失败: {str(e)}")

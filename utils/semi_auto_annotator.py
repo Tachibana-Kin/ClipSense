@@ -132,19 +132,23 @@ class SemiAutoAnnotator:
                 for label_list in annotations["train"].values():
                     all_labels.update(label_list)
             
-            # 保存类别文件（使用GBK编码，LabelImg默认使用GBK）
-            with open(classes_file, 'w', encoding='gbk', errors='ignore') as f:
+            # 保存类别文件（使用UTF-8编码，LabelImg的load_predefined_classes方法使用UTF-8）
+            with open(classes_file, 'w', encoding='utf-8') as f:
                 for label in sorted(all_labels):
                     # 确保标签是字符串类型
                     if isinstance(label, str):
-                        # 尝试编码为GBK，忽略无法编码的字符
-                        try:
-                            f.write(label + '\n')
-                        except UnicodeEncodeError:
-                            # 如果编码失败，使用替代字符
-                            f.write(label.encode('gbk', errors='ignore').decode('gbk') + '\n')
+                        f.write(label + '\n')
+            
+            # 在图像目录中也创建一个classes.txt文件，因为YoloReader会在那里寻找
+            image_dir_classes = os.path.join(image_dir, "classes.txt")
+            with open(image_dir_classes, 'w', encoding='utf-8') as f:
+                for label in sorted(all_labels):
+                    # 确保标签是字符串类型
+                    if isinstance(label, str):
+                        f.write(label + '\n')
             
             print(f"创建类别文件: {classes_file}")
+            print(f"在图像目录中创建类别文件: {image_dir_classes}")
             print(f"包含 {len(all_labels)} 个类别")
             
             print(f"正在打开LabelImg标注工具")
